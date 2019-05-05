@@ -59,7 +59,7 @@ using namespace Garfield;
 //#define DRAW_ARROW 1
 //#define DRAW_CANVAS 1
 #endif
-//#define BEAM_TRACK 1
+#define BEAM_TRACK 1
 //#define ORIGINAL_DRIFT 1
 //#define ONE_ELE 1
 
@@ -108,8 +108,8 @@ int main(int argc, char *argv[]){
   
   /* read energy to range table */
   char grfilename[512], gr2filename[512];
-  sprintf(grfilename,  "%s/tables/ene_to_range_%s_%d.dat", workdir, detection_gas, press);
-  sprintf(gr2filename, "%s/tables/range_to_ene_%s_%d.dat", workdir, detection_gas, press);  
+  sprintf(grfilename,  "%s/tables/ene_to_range_%d.dat", workdir, press);
+  sprintf(gr2filename, "%s/tables/range_to_ene_%d.dat", workdir, press);  
   printf("range table: %s\n", grfilename);
   TGraph *gr_range;
   gr_range = new TGraph(grfilename);
@@ -200,7 +200,7 @@ int main(int argc, char *argv[]){
 
   /* Read Magboltz file */
   char magfname[512];
-  sprintf(magfname, "%s/tables/%s_%d.gas", workdir, detection_gas, press);
+  sprintf(magfname, "%s/tables/He-96_CO2-4_%d.gas", workdir, press);
 
   MediumMagboltz* gas = new MediumMagboltz();
   int magres = gas->LoadGasFile(magfname);
@@ -273,29 +273,61 @@ int main(int argc, char *argv[]){
   
   /* Read Srim file */
 //****  char srimfname_alpha[512], srimfname_10c[512];
-  char srimfname_alpha[512];
-  sprintf(srimfname_alpha, "%s/tables/4He_%s_%d.srim", workdir, detection_gas, press);
-//****  sprintf(srimfname_10c,   "%s/tables/10C_HeCO2_96_4_%d.srim", workdir, press);  
+  char srimfname[512];
+  sprintf(srimfname,   "%s/tables/alpha_HeCO2_96_4_%d.srim", workdir, press);  
 
-  TrackSrim* srim_alpha = new TrackSrim();
-  srim_alpha->SetSensor(sensor);
-  if(srim_alpha->ReadFile(srimfname_alpha)==0){
-    printf("error in reading SRIM file: %s\n", srimfname_alpha);
+  TrackSrim* srim[max_particle];
+  srim[0] = new TrackSrim();
+  srim[0]->SetSensor(sensor);
+  if(srim[0]->ReadFile(srimfname)==0){
+    printf("error in reading SRIM file: %s\n", srimfname);
     exit(0);
   }
 
-  srim_alpha->SetWorkFunction(W_Val[detection_gas]);  // in eV
-  srim_alpha->SetFanoFactor(Fano_Factor);
-  srim_alpha->SetModel(4);
-  srim_alpha->SetAtomicMassNumbers(Mass[detection_gas],Charge[detection_gas]); // changed by T. Doi 2019/3/28
-  srim_alpha->SetDensity(density[detection_gas]);
+  srim[0]->SetWorkFunction(W_Val[detection_gas]);  // in eV
+  srim[0]->SetFanoFactor(Fano_Factor);
+  srim[0]->SetModel(4);
+  srim[0]->SetAtomicMassNumbers(Mass[detection_gas],Charge[detection_gas]); // changed by T. Doi 2019/3/28
+  srim[0]->SetDensity(density[detection_gas]);
 
-  srim_alpha->SetTargetClusterSize(Cluster_Size);  
-  srim_alpha->DisableTransverseStraggling();
-  srim_alpha->DisableLongitudinalStraggling();
+  srim[0]->SetTargetClusterSize(Cluster_Size);  
+  srim[0]->DisableTransverseStraggling();
+  srim[0]->DisableLongitudinalStraggling();
+
+  sprintf(srimfname, "%s/tables/10C_HeCO2_96_4_%d.srim", workdir, press);
+  srim[1] = new TrackSrim();
+  srim[1]->SetSensor(sensor);
+  if(srim[1]->ReadFile(srimfname)==0){
+    printf("error in reading SRIM file: %s\n", srimfname);
+    exit(0);
+  }
+
+  srim[1]->SetWorkFunction(W_Val[detection_gas]);
+  srim[1]->SetFanoFactor(Fano_Factor);
+  srim[1]->SetModel(4);
+  srim[1]->SetAtomicMassNumbers(Mass[detection_gas], Charge[detection_gas]);
+  srim[1]->SetDensity(density[detection_gas]);
+
+  srim[1]->SetTargetClusterSize(Cluster_Size);
+  srim[1]->DisableTransverseStraggling();
+  srim[1]->DisableLongitudinalStraggling();
+
+  sprintf(srimfname, "%s/tables/12C_HeCO2_96_4_%d.srim", workdir, press);
+  srim[2] = new TrackSrim();
+  srim[2]->SetSensor(sensor);
+  srim[2]->SetFanoFactor(Fano_Factor);
+  srim[2]->SetModel(4);
+  srim[2]->SetAtomicMassNumbers(Mass[detection_gas], Charge[detection_gas]);
+  srim[2]->SetDensity(density[detection_gas]);
+
+  srim[2]->SetTargetClusterSize(Cluster_Size);
+  srim[2]->DisableTransverseStraggling();
+  srim[2]->DisableLongitudinalStraggling();
 
   printf("************************************************************\n");
-  srim_alpha->Print();
+  srim[0]->Print();
+  srim[1]->Print();
+  srim[2]->Print();
   printf("************************************************************\n");
 
   // random generators
@@ -451,7 +483,8 @@ int main(int argc, char *argv[]){
     printf("%d \n",ii);
 
     // set particle data
-    decay12C(alpha);
+    int particle[nAlpha];
+    decay12C(alpha,particle);
 //    theta3_deg = alpha[0].Theta();
 //    theta3_rad = theta3_deg*(TMath::DegToRad());
 //    phi3_deg = rndm->Uniform(0.,359.);
@@ -466,23 +499,21 @@ int main(int argc, char *argv[]){
     vtx_y = rndm->Gaus(VTX_Y_MEAN, VTX_Y_SIGMA);  
     vtx_z = rndm->Uniform(VTX_Z_START, VTX_Z_STOP);
     
-    int alpha_inside = 0;
-    
     clear_raw_wave(raw_wave);
     clear_fadc_data(fadc_data);	    
     clear_tpc_data(tpc_data);
     
-    for(int i_alpha=0;i_alpha<nAlpha;i_alpha++){
-      theta3_rad[i_alpha] = alpha[i_alpha].Theta();
-      phi3_rad[i_alpha] = alpha[i_alpha].Phi();
-      theta3_deg[i_alpha] = theta3_rad[i_alpha]*(TMath::RadToDeg());
-      phi3_deg[i_alpha] = phi3_rad[i_alpha]*(TMath::RadToDeg());
+    for(int i_particle=0;i_particle<nAlpha;i_particle++){
+      theta3_rad[i_particle] = alpha[i_particle].Theta();
+      phi3_rad[i_particle] = alpha[i_particle].Phi();
+      theta3_deg[i_particle] = theta3_rad[i_particle]*(TMath::RadToDeg());
+      phi3_deg[i_particle] = phi3_rad[i_particle]*(TMath::RadToDeg());
       //    printf("Ex2=%f, theta3=%.2f\n", Ex2, theta3_deg);
-      e3[i_alpha] = (alpha[i_alpha].E()-M_alpha)*MeV;
+      e3[i_particle] = (alpha[i_particle].E()-M_alpha)*MeV;
       
-      range[i_alpha] = gr_range->Eval(e3[i_alpha]);
-      range_rec[i_alpha] = range[i_alpha] + rndm->Gaus(0, RANGE_RESO);
-      e3_rec[i_alpha] = gr_ene->Eval(range_rec[i_alpha]);
+      range[i_particle] = gr_range->Eval(e3[i_particle]);
+      range_rec[i_particle] = range[i_particle] + rndm->Gaus(0, RANGE_RESO);
+      e3_rec[i_particle] = gr_ene->Eval(range_rec[i_particle]);
       total_cnt=0;
       stop_cnt=0;
       
@@ -501,47 +532,130 @@ int main(int argc, char *argv[]){
 //****      dy = range*sin(theta3_rad)*sin(phi3_rad);	  
 //****      dz = -1.0*range*cos(theta3_rad);
 //****      dr = sqrt(dx*dx+dy*dy+dz*dz);
-      dx[i_alpha] = range[i_alpha]*alpha[i_alpha].X()/sqrt(alpha[i_alpha].X()*alpha[i_alpha].X()+
-							   alpha[i_alpha].Y()*alpha[i_alpha].Y()+
-							   alpha[i_alpha].Z()*alpha[i_alpha].Z());
-      dy[i_alpha] = range[i_alpha]*alpha[i_alpha].Y()/sqrt(alpha[i_alpha].X()*alpha[i_alpha].X()+
-							   alpha[i_alpha].Y()*alpha[i_alpha].Y()+
-							   alpha[i_alpha].Z()*alpha[i_alpha].Z());
-      dz[i_alpha] = -1.0*range[i_alpha]*alpha[i_alpha].Z()/sqrt(alpha[i_alpha].X()*alpha[i_alpha].X()+
-								alpha[i_alpha].Y()*alpha[i_alpha].Y()+
-								alpha[i_alpha].Z()*alpha[i_alpha].Z());
-      dr[i_alpha] = sqrt(dx[i_alpha]*dx[i_alpha]+dy[i_alpha]*dy[i_alpha]+dz[i_alpha]*dz[i_alpha]);
+      dx[i_particle] = range[i_particle]*alpha[i_particle].X()/sqrt(alpha[i_particle].X()*alpha[i_particle].X()+
+							   alpha[i_particle].Y()*alpha[i_particle].Y()+
+							   alpha[i_particle].Z()*alpha[i_particle].Z());
+      dy[i_particle] = range[i_particle]*alpha[i_particle].Y()/sqrt(alpha[i_particle].X()*alpha[i_particle].X()+
+							   alpha[i_particle].Y()*alpha[i_particle].Y()+
+							   alpha[i_particle].Z()*alpha[i_particle].Z());
+      dz[i_particle] = -1.0*range[i_particle]*alpha[i_particle].Z()/sqrt(alpha[i_particle].X()*alpha[i_particle].X()+
+								alpha[i_particle].Y()*alpha[i_particle].Y()+
+								alpha[i_particle].Z()*alpha[i_particle].Z());
+      dr[i_particle] = sqrt(dx[i_particle]*dx[i_particle]+dy[i_particle]*dy[i_particle]+dz[i_particle]*dz[i_particle]);
       
-      stop_x[i_alpha] = vtx_x + dx[i_alpha];
-      stop_y[i_alpha] = vtx_y + dy[i_alpha];
-      stop_z[i_alpha] = vtx_z + dz[i_alpha];
-    } // end of for(int i_alpha=...)
+      stop_x[i_particle] = vtx_x + dx[i_particle];
+      stop_y[i_particle] = vtx_y + dy[i_particle];
+      stop_z[i_particle] = vtx_z + dz[i_particle];
+    } // end of for(int i_particle=...)
 
     double trig_time = GetTrigTime(vtx_y, stop_y, driftv);
-    
-    for(int i_alpha=0;i_alpha<nAlpha;i_alpha++){  
-      
-//****      recoil_track_a_x[i_alpha][0] = vtx_z*N_STRP/TPC_SIZE;
-//****      recoil_track_a_y[i_alpha][0] = (vtx_y/driftv+trig_time)*SAMPLING_RATIO; // mm*ns/mm = ns/freq(GHz) = ch
-//****      recoil_track_c_x[i_alpha][0] = vtx_x*N_STRP/TPC_SIZE;
-//****      recoil_track_c_y[i_alpha][0] = (vtx_y/driftv+trig_time)*SAMPLING_RATIO;	  
-//****      
-//****      recoil_track_a_x[i_alpha][1] = stop_z[i_alpha]*N_STRP/TPC_SIZE;
-//****      recoil_track_a_y[i_alpha][1] = (stop_y[i_alpha]/driftv+trig_time)*SAMPLING_RATIO;
-//****      recoil_track_c_x[i_alpha][1] = stop_x[i_alpha]*N_STRP/TPC_SIZE;
-//****      recoil_track_c_y[i_alpha][1] = (stop_y[i_alpha]/driftv+trig_time)*SAMPLING_RATIO;
-//****      ar_anode[i_alpha] = TArrow(recoil_track_a_x[i_alpha][0],recoil_track_a_y[i_alpha][0],
-//****				 recoil_track_a_x[i_alpha][1],recoil_track_a_y[i_alpha][1],0.01,"|>");
-//****      ar_cathode[i_alpha] = TArrow(recoil_track_c_x[i_alpha][0],recoil_track_c_y[i_alpha][0],
-//****				   recoil_track_c_x[i_alpha][1],recoil_track_c_y[i_alpha][1],0.01,"|>");
-//****      ar_anode[i_alpha].SetLineColor(kRed);
-//****      ar_cathode[i_alpha].SetLineColor(kRed);
-//****      ar_anode[i_alpha].SetFillColor(kRed);
-//****      ar_cathode[i_alpha].SetFillColor(kRed);
-//****      ar_anode[i_alpha].SetLineWidth(3);
-//****      ar_cathode[i_alpha].SetLineWidth(3);
 
-      stop_inside = judge_stop_inside(stop_x[i_alpha], stop_y[i_alpha], stop_z[i_alpha]);
+#ifdef BEAM_TRACK
+    srim[1]->SetKineticEnergy(beam_ene*1.0e6);
+    if(!srim[1]->NewTrack(vtx_x*mmTocm, vtx_y*mmTocm, vtx_z*mmTocm, t_0, 0, 0, 1)){
+      std::cerr << "Generating clusters failed; skipping this track." << std::endl;
+      continue;
+    }
+    n_cluster = 0;
+    
+    /* get cluster position of recoil alpha */
+    tot_ne=0;
+    
+    bool first_flag = true;
+    double vtx_drift_time;
+    
+    while(srim[1]->GetCluster(cluster_pos[1], cluster_pos[2], cluster_pos[3],
+				cluster_pos[0],
+				ne, ec, ekin)){
+      if(cluster_pos[3] > STOP_Z_MAX){
+	break;
+      }
+      std::cout << cluster_pos[1] << " " << cluster_pos[2] << " " << cluster_pos[3] << std::endl;
+      std::cout << ne << " " << ec << " " << ekin << std::endl;
+      n_cluster++;
+      tot_ne+=ne;
+      
+      
+      if(n_cluster%100==0){
+	printf("cluster:%d, z=%f\n", n_cluster, cluster_pos[3]*cmTomm);
+      }
+      
+      /* drift each electron in the cluster */
+#ifdef ONE_ELE
+      int ie=0;
+      int add_ele=1;
+#endif
+      
+#ifndef ONE_ELE
+      int ie=ne-1;
+      int add_ele=ne;
+#endif
+      while(ie<ne){
+#ifndef ORIGINAL_DRIFT
+	if(drift->AvalancheElectron(cluster_pos[1], cluster_pos[2], cluster_pos[3], cluster_pos[0])){
+	  double ne_sub = drift->GetNumberOfElectronEndpoints();
+	  for(int ie_sub=0;ie_sub<ne_sub;ie_sub++){
+	    drift->GetElectronEndpoint(ie_sub,// original is 0
+				       cluster_pos[1],cluster_pos[2],cluster_pos[3],
+				       cluster_pos[0],
+				       ele_end_pos[1],ele_end_pos[2],ele_end_pos[3],
+				       ele_end_pos[0],
+				       drift_status);
+	    drift_time = (ele_end_pos[0]-cluster_pos[0]);
+	    //****		drift_time = ele_end_pos[0]-trig_time;
+	    add_raw_wave2(ele_end_pos, drift_time, add_ele,
+			  wave_spline, GAS_GAIN, raw_wave);
+	    if(first_flag){
+	      vtx_drift_time = drift_time;
+	      first_flag = false;
+	    }
+	  } // end of for(int ie_sub...)
+	}// end of if(drift->...)
+	ie++;
+#endif
+	
+#ifdef ORIGINAL_DRIFT	      
+	drift_electron2(cluster_pos, driftv, diff_tra, diff_long,
+			gen_tra, gen_long, ele_end_pos);
+	
+	//****	    drift_time = (ele_end_pos[0]-cluster_pos[0]);
+	drift_time = ele_end_pos[0]-trig_time;
+	
+	//		add_raw_wave(ele_end_pos, drift_time, add_ele,
+	//			     wave_temp, GAS_GAIN, raw_wave);
+	add_raw_wave2(ele_end_pos, drift_time, add_ele,
+		      wave_spline, GAS_GAIN, raw_wave);
+	ie++;
+#endif
+      } // end of while(ie<ne)
+    } // end of cluster loop
+#endif // end of #ifdef BEAM_TRACK
+
+    int alpha_inside = 0;
+    
+    for(int i_particle=0;i_particle<nAlpha;i_particle++){  
+      
+//****      recoil_track_a_x[i_particle][0] = vtx_z*N_STRP/TPC_SIZE;
+//****      recoil_track_a_y[i_particle][0] = (vtx_y/driftv+trig_time)*SAMPLING_RATIO; // mm*ns/mm = ns/freq(GHz) = ch
+//****      recoil_track_c_x[i_particle][0] = vtx_x*N_STRP/TPC_SIZE;
+//****      recoil_track_c_y[i_particle][0] = (vtx_y/driftv+trig_time)*SAMPLING_RATIO;	  
+//****      
+//****      recoil_track_a_x[i_particle][1] = stop_z[i_particle]*N_STRP/TPC_SIZE;
+//****      recoil_track_a_y[i_particle][1] = (stop_y[i_particle]/driftv+trig_time)*SAMPLING_RATIO;
+//****      recoil_track_c_x[i_particle][1] = stop_x[i_particle]*N_STRP/TPC_SIZE;
+//****      recoil_track_c_y[i_particle][1] = (stop_y[i_particle]/driftv+trig_time)*SAMPLING_RATIO;
+//****      ar_anode[i_particle] = TArrow(recoil_track_a_x[i_particle][0],recoil_track_a_y[i_particle][0],
+//****				 recoil_track_a_x[i_particle][1],recoil_track_a_y[i_particle][1],0.01,"|>");
+//****      ar_cathode[i_particle] = TArrow(recoil_track_c_x[i_particle][0],recoil_track_c_y[i_particle][0],
+//****				   recoil_track_c_x[i_particle][1],recoil_track_c_y[i_particle][1],0.01,"|>");
+//****      ar_anode[i_particle].SetLineColor(kRed);
+//****      ar_cathode[i_particle].SetLineColor(kRed);
+//****      ar_anode[i_particle].SetFillColor(kRed);
+//****      ar_cathode[i_particle].SetFillColor(kRed);
+//****      ar_anode[i_particle].SetLineWidth(3);
+//****      ar_cathode[i_particle].SetLineWidth(3);
+
+      stop_inside = judge_stop_inside(stop_x[i_particle], stop_y[i_particle], stop_z[i_particle]);
 //****      if(range<25) stop_inside = 0;    // range gate added on 2019/01/03
 //****      if(stop_inside==1){
 //****
@@ -554,8 +668,11 @@ int main(int argc, char *argv[]){
 //****      }
       
       /* inject alpha particle for SRIM calc */
-      srim_alpha->SetKineticEnergy(e3[i_alpha]*1.0e6);
-      if(stop_inside==1){
+      srim[particle[i_particle]]->SetKineticEnergy(e3[i_particle]*1.0e6);
+      if(particle[i_particle]>=max_particle){
+	exit(0);
+      }
+      if(stop_inside==1||particle[i_particle]!=0){
 	stop_cnt++;
 	alpha_inside++;
 	
@@ -565,7 +682,8 @@ int main(int argc, char *argv[]){
 //****	  std::cerr << "Generating clusters failed; skipping this track.\n";
 //****	  continue;
 //****	}
-	if(!srim_alpha->NewTrack(vtx_x*mmTocm, vtx_y*mmTocm, vtx_z*mmTocm, t_0, dx[i_alpha], dy[i_alpha], dz[i_alpha])){
+	if(!srim[particle[i_particle]]->NewTrack(vtx_x*mmTocm, vtx_y*mmTocm, vtx_z*mmTocm, t_0,
+						 dx[i_particle], dy[i_particle], dz[i_particle])){
 	  std::cerr << "Generating clusters failed; skipping this track." << std::endl;
 	  continue;
 	}
@@ -577,14 +695,14 @@ int main(int argc, char *argv[]){
 	bool first_flag = true;
 	double vtx_drift_time;
 	
-	while(srim_alpha->GetCluster(cluster_pos[1], cluster_pos[2], cluster_pos[3],
-				     cluster_pos[0],
-				     ne, ec, ekin)){
+	while(srim[particle[i_particle]]->GetCluster(cluster_pos[1], cluster_pos[2], cluster_pos[3],
+						     cluster_pos[0],
+						     ne, ec, ekin)){
 	  
 	  n_cluster++;
 	  tot_ne+=ne;
 	  
-	  
+	 
 	  if(n_cluster%100==0){
 	    printf("cluster:%d, z=%f\n", n_cluster, cluster_pos[3]*cmTomm);
 	  }
@@ -639,35 +757,35 @@ int main(int argc, char *argv[]){
 	  } // end of while(ie<ne)
 	} // end of alpha cluster loop
 	
-	recoil_track_a_x[i_alpha][0] = vtx_z*N_STRP/TPC_SIZE;
-	recoil_track_a_y[i_alpha][0] = (vtx_drift_time+BUFF_TIME)*SAMPLING_RATIO; // mm*ns/mm = ns/freq(GHz) = ch
-	recoil_track_c_x[i_alpha][0] = vtx_x*N_STRP/TPC_SIZE;
-	recoil_track_c_y[i_alpha][0] = (vtx_drift_time+BUFF_TIME)*SAMPLING_RATIO;	  
+	recoil_track_a_x[i_particle][0] = vtx_z*N_STRP/TPC_SIZE;
+	recoil_track_a_y[i_particle][0] = (vtx_drift_time+BUFF_TIME)*SAMPLING_RATIO; // mm*ns/mm = ns/freq(GHz) = ch
+	recoil_track_c_x[i_particle][0] = vtx_x*N_STRP/TPC_SIZE;
+	recoil_track_c_y[i_particle][0] = (vtx_drift_time+BUFF_TIME)*SAMPLING_RATIO;	  
 	
-	recoil_track_a_x[i_alpha][1] = cluster_pos[3]*cmTomm*N_STRP/TPC_SIZE;
-	recoil_track_a_y[i_alpha][1] = (drift_time+BUFF_TIME)*SAMPLING_RATIO;
-	recoil_track_c_x[i_alpha][1] = cluster_pos[1]*cmTomm*N_STRP/TPC_SIZE;
-	recoil_track_c_y[i_alpha][1] = (drift_time+BUFF_TIME)*SAMPLING_RATIO;
+	recoil_track_a_x[i_particle][1] = cluster_pos[3]*cmTomm*N_STRP/TPC_SIZE;
+	recoil_track_a_y[i_particle][1] = (drift_time+BUFF_TIME)*SAMPLING_RATIO;
+	recoil_track_c_x[i_particle][1] = cluster_pos[1]*cmTomm*N_STRP/TPC_SIZE;
+	recoil_track_c_y[i_particle][1] = (drift_time+BUFF_TIME)*SAMPLING_RATIO;
 #ifdef DRAW_ARROW
-	ar_anode[i_alpha] = TArrow(recoil_track_a_x[i_alpha][0],recoil_track_a_y[i_alpha][0],
-				   recoil_track_a_x[i_alpha][1],recoil_track_a_y[i_alpha][1],0.01,"|>");
-	ar_cathode[i_alpha] = TArrow(recoil_track_c_x[i_alpha][0],recoil_track_c_y[i_alpha][0],
-				     recoil_track_c_x[i_alpha][1],recoil_track_c_y[i_alpha][1],0.01,"|>");
-	ar_anode[i_alpha].SetLineColor(kRed);
-	ar_cathode[i_alpha].SetLineColor(kRed);
-	ar_anode[i_alpha].SetFillColor(kRed);
-	ar_cathode[i_alpha].SetFillColor(kRed);
-	ar_anode[i_alpha].SetLineWidth(3);
-	ar_cathode[i_alpha].SetLineWidth(3);
+	ar_anode[i_particle] = TArrow(recoil_track_a_x[i_particle][0],recoil_track_a_y[i_particle][0],
+				   recoil_track_a_x[i_particle][1],recoil_track_a_y[i_particle][1],0.01,"|>");
+	ar_cathode[i_particle] = TArrow(recoil_track_c_x[i_particle][0],recoil_track_c_y[i_particle][0],
+				     recoil_track_c_x[i_particle][1],recoil_track_c_y[i_particle][1],0.01,"|>");
+	ar_anode[i_particle].SetLineColor(kRed);
+	ar_cathode[i_particle].SetLineColor(kRed);
+	ar_anode[i_particle].SetFillColor(kRed);
+	ar_cathode[i_particle].SetFillColor(kRed);
+	ar_anode[i_particle].SetLineWidth(3);
+	ar_cathode[i_particle].SetLineWidth(3);
 #endif
 
 	
 //****	printf("theta=%.1f, e3=%.2f MeV, phi=%.1f, range=%.1f, cluster num=%d, tot_ne=%d\n",
 //****	       theta3_rad, e3, phi3_rad, range, n_cluster, tot_ne);
 	printf("theta=%.1f, e3=%.2f MeV, phi=%.1f, range=%.1f, cluster num=%d, tot_ne=%d\n",
-	       theta3_deg[i_alpha], e3[i_alpha], phi3_deg[i_alpha], range[i_alpha], n_cluster, tot_ne);
+	       theta3_deg[i_particle], e3[i_particle], phi3_deg[i_particle], range[i_particle], n_cluster, tot_ne);
 	printf("track end position: %.2f, %.2f, %.2f\n",
-	       stop_x[i_alpha], stop_y[i_alpha], stop_z[i_alpha]);
+	       stop_x[i_particle], stop_y[i_particle], stop_z[i_particle]);
 	// end of alpha particle track
 	
 #endif // end of #ifdef ALPHA_TRACK
@@ -689,7 +807,7 @@ int main(int argc, char *argv[]){
 //****		int(recoil_track_c_x[0]),int(recoil_track_c_y[0]),int(recoil_track_c_x[1]),int(recoil_track_c_y[1]));
   
       } // end of if(stop_inside==1)
-    }  // end of i_alpha loop
+    }  // end of i_particle loop
 
     if(alpha_inside == nAlpha){
       make_fadc_data(raw_wave, fadc_data);
@@ -710,8 +828,8 @@ int main(int argc, char *argv[]){
       c1->Clear();
       h_raw_anode->Draw("colz");
 #ifdef DRAW_ARROW
-      for(Int_t i_alpha=0;i_alpha<nAlpha;i_alpha++){
-	ar_anode[i_alpha].Draw();
+      for(Int_t i_particle=0;i_particle<nAlpha;i_particle++){
+	ar_anode[i_particle].Draw();
       }
 #endif
 #endif
@@ -721,8 +839,8 @@ int main(int argc, char *argv[]){
       c2->Clear();
       h_raw_cathode->Draw("colz");
 #ifdef DRAW_ARROW
-      for(Int_t i_alpha=0;i_alpha<nAlpha;i_alpha++){
-	ar_cathode[i_alpha].Draw();
+      for(Int_t i_particle=0;i_particle<nAlpha;i_particle++){
+	ar_cathode[i_particle].Draw();
       }
 #endif
 #endif
@@ -732,8 +850,8 @@ int main(int argc, char *argv[]){
       c3->Clear();
       h_anode->Draw("box");
 #ifdef DRAW_ARROW
-      for(Int_t i_alpha=0;i_alpha<nAlpha;i_alpha++){
-	ar_anode[i_alpha].Draw();
+      for(Int_t i_particle=0;i_particle<nAlpha;i_particle++){
+	ar_anode[i_particle].Draw();
       }
 #endif
 #endif
@@ -743,8 +861,8 @@ int main(int argc, char *argv[]){
       c4->Clear();
       h_cathode->Draw("box");
 #ifdef DRAW_ARROW
-      for(Int_t i_alpha=0;i_alpha<nAlpha;i_alpha++){
-	ar_cathode[i_alpha].Draw();
+      for(Int_t i_particle=0;i_particle<nAlpha;i_particle++){
+	ar_cathode[i_particle].Draw();
       }
 #endif
 #endif
@@ -767,17 +885,17 @@ int main(int argc, char *argv[]){
 	}
       }
       fprintf(file_tpc,"\n");
-      for(int i_alpha=0;i_alpha<nAlpha;i_alpha++){
+      for(int i_particle=0;i_particle<nAlpha;i_particle++){
 	for(int a=0;a<2;a++){
-	  fprintf(file_para,"%f ",recoil_track_a_x[i_alpha][a]);
-	  fprintf(file_para,"%f ",recoil_track_a_y[i_alpha][a]);
-	  fprintf(file_para,"%f ",recoil_track_c_x[i_alpha][a]);
-	  fprintf(file_para,"%f ",recoil_track_c_y[i_alpha][a]);
+	  fprintf(file_para,"%f ",recoil_track_a_x[i_particle][a]);
+	  fprintf(file_para,"%f ",recoil_track_a_y[i_particle][a]);
+	  fprintf(file_para,"%f ",recoil_track_c_x[i_particle][a]);
+	  fprintf(file_para,"%f ",recoil_track_c_y[i_particle][a]);
 	}
-	fprintf(file_para,"%f ",e3[i_alpha]);
-	fprintf(file_para,"%f ",theta3_deg[i_alpha]);
-	fprintf(file_para,"%f ",phi3_deg[i_alpha]);
-	fprintf(file_para,"%f ",dr[i_alpha]);
+	fprintf(file_para,"%f ",e3[i_particle]);
+	fprintf(file_para,"%f ",theta3_deg[i_particle]);
+	fprintf(file_para,"%f ",phi3_deg[i_particle]);
+	fprintf(file_para,"%f ",dr[i_particle]);
       }
       fprintf(file_para,"\n");
 #endif

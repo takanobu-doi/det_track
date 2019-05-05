@@ -1,7 +1,7 @@
 #include "12C_3alpha.hpp"
 #include <random>
 
-void decay12C(TLorentzVector decay_alpha[])
+void decay12C(TLorentzVector decay_alpha[], int particle[])
 {
   TRandom *rndm = new TRandom();
   std::random_device seed_gen;
@@ -9,16 +9,17 @@ void decay12C(TLorentzVector decay_alpha[])
   Double_t E_beam = T_beam+M_n;
   Double_t Pz_beam = TMath::Sqrt(E_beam*E_beam-M_n*M_n);
   TLorentzVector beam(0.0,0.0,Pz_beam,E_beam);
-  TLorentzVector target(0.0,0.0,0.0,M_12C);
+  TLorentzVector target(0.0,0.0,0.0,M_10C);
   TLorentzVector W = beam+target;
-  Double_t masses1[2] = {M_12C+7.644/MeV,M_n};
+  Double_t masses1[2] = {M_alpha,M_10C};
+  particle[0] = 0; // 0:4He 1:10C 2:12C
+  particle[1] = 1;
+//  Doutle_t masses1[2] = {M_12C, M_10C};
+//  particle[0] = 2;
+//  particle[1] = 1;
 
   TGenPhaseSpace *event = new TGenPhaseSpace();
 
-  Double_t masses2[nAlpha] = {M_alpha,M_alpha,M_alpha};
-  Double_t E_alpha[3];
-
-  TLorentzVector *sca1[2];
   Double_t weight;
   Double_t uniform_rndm;
 
@@ -29,15 +30,6 @@ void decay12C(TLorentzVector decay_alpha[])
     uniform_rndm = rndm->Uniform(0.,event->GetWtMax());
   }while(uniform_rndm > weight);
   for(Int_t n=0;n<2;n++){
-    sca1[n] = event->GetDecay(n);
-  }
-
-  event->SetDecay(*sca1[0],nAlpha,masses2);
-  do{
-    weight = event->Generate();
-    uniform_rndm = rndm->Uniform(0.,event->GetWtMax());
-  }while(uniform_rndm > weight);
-  for(Int_t n=0;n<nAlpha;n++){
     decay_alpha[n] = *event->GetDecay(n);
   }
 
@@ -75,7 +67,7 @@ int decay12C(std::vector<TLorentzVector> *decay_alpha,int flag)
     break;
     }
   }
-  Double_t masses2[nAlpha] = {M_alpha,M_alpha,M_alpha};
+  Double_t masses2[nAlpha] = {M_alpha,M_alpha};
   Double_t E_alpha[3];
 
   TLorentzVector *sca1[2];

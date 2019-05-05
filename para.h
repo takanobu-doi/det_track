@@ -14,11 +14,11 @@ const int N_EVENT = 1000; //number of event generation
 const int MAX_FILE_EVENT = 1000;
 
 const char detection_gas[128] = "CH4-1"; // CH4 iso-C4H10 CH4-* iso-C4H10-*
-const int press = 300;   // hPa
+const int press = 500;   // hPa
 //const int press = 1000;  // for 1000 hPa
 const std::string FILENAME = "test";
 
-const Int_t nAlpha = 3; //number of decay products
+const Int_t nAlpha = 2; //number of decay products
 
 const double FADC_WID    = 12.8;          // width of the 32 strips (mm)
 const double STRP_WID    =  0.4;          // width of the 1 strip (mm)
@@ -64,7 +64,7 @@ const double STOP_Y_MAX  = 110.0;  // TPC boundary up (mm)
 const double STOP_Z_MIN  = 10*STRP_WID;       // TPC boundary upstream (mm)  take 10 strips mergin
 const double STOP_Z_MAX  = 102.4-10*STRP_WID; // TPC boundary downsteram (mm)
 
-const double beam_ene = 14.;
+const double beam_ene = 750.;
 const double ene_10C = 780;
 const double ene_12C = 1152;
 const double AMU = 931.494095;
@@ -78,6 +78,8 @@ const double Mass_12C = AMU*12 + MassEx_12C;
 const double Mass_4He = AMU*4  + MassEx_4He;
 const double Mass_n = AMU*1 + MassEx_n;
 const double Mass_p = AMU*1 + MassEx_p;
+
+const int max_particle = 3; // 0:4He 1:10C 2:12C 3:16O
 
 const int N_AC = 2;
 const int ANODE = 0;
