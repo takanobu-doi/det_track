@@ -52,3 +52,5 @@ int drift_electron2(double start[4],
 		    double stop[4]);
 
 int add_fadc_noise(int*** fadc_data, TRandom3 *gen_noise, double noise);
+
+double GetTrigTime(double vtx_y, double stop_y[], double driftv);

@@ -47,7 +47,7 @@ int add_raw_wave(double ele_end_pos[4],   // input data
 }
 
 int add_raw_wave2(double ele_end_pos[4],   // input data 
-		  double drift_time,       // input data
+		  double drift_time,       // input data (ns)
 		  int ne,                  // input data
 		  TSpline5 *wave_spline,   // input wave template
 		  double gain,             // input data
@@ -60,9 +60,9 @@ int add_raw_wave2(double ele_end_pos[4],   // input data
   double tmp_height;
   int max_flag=0;
   double max_height;
-
   double min_height;
   int break_flag;
+  
   min_height = wave_spline->Eval(0)*ne*gain;
   
   end_strp[0] = get_upic_strp_num(ele_end_pos[3]*cmTomm);
@@ -72,9 +72,10 @@ int add_raw_wave2(double ele_end_pos[4],   // input data
     break_flag=0;
     max_flag=0;
     if(end_strp[i]>=0 && end_strp[i]<N_STRP){
-      for(j=0; j<N_TCLK; j++){
-	ns = j*10.0;
-	pulse_height = wave_spline->Eval(ns-drift_time)*ne*gain;
+      for(j=0; j<N_TCLK; j++){ // j is 10 /ns = 0.1 GHz
+//****	ns = j*10.0;
+	ns = j/SAMPLING_RATIO;
+	pulse_height = wave_spline->Eval(ns-drift_time-BUFF_TIME)*ne*gain;
 
 	if(max_flag==0 && pulse_height<tmp_height && pulse_height>min_height*2){
 	  max_flag = 1;
@@ -236,4 +237,20 @@ int add_fadc_noise(int*** fadc_data, TRandom3 *gen_noise, double noise){
     }
   }
   return 0;
+}
+
+double GetTrigTime(double vtx_y, double stop_y[], double driftv)
+{
+  double trig_time;
+  double temp_trig = vtx_y;
+
+  for(int ii=0;ii<nAlpha;ii++){
+    if(stop_y[ii]<vtx_y){
+      temp_trig = stop_y[ii];
+    }
+  }
+
+  trig_time = temp_trig/driftv;
+
+  return trig_time; // ns
 }
