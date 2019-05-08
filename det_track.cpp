@@ -151,7 +151,7 @@ int main(int argc, char *argv[]){
   int neve;         // number of total generated event
 
   kinema a;
-  a.setparticles("10c","4he","4he","10c");
+  a.setparticles("10c","12c","12c","10c");
 
   /* garfield parameters */
   double cluster_pos[4];
@@ -369,7 +369,7 @@ int main(int argc, char *argv[]){
   
   /* Read Srim file */
   char srimfname_alpha[512], srimfname_10c[512];
-  sprintf(srimfname_alpha, "%s/tables/alpha_HeCO2_96_4_%d.srim", workdir, press);
+  sprintf(srimfname_alpha, "%s/tables/12C_HeCO2_96_4_%d.srim", workdir, press);
   sprintf(srimfname_10c,   "%s/tables/10C_HeCO2_96_4_%d.srim", workdir, press);  
 
   TrackSrim* srim_alpha = new TrackSrim();
@@ -531,9 +531,9 @@ int main(int argc, char *argv[]){
   FILE *fp_r[filesize];
   char filename[1024];
   for(int ii=0;ii<filesize;ii++){
-    sprintf(filename,"simu_track-%d.dat",ii);
+    sprintf(filename,"12C_track-%d.dat",ii);
     fp_t[ii] = fopen(filename,"w");
-    sprintf(filename,"simu_result-%d.dat",ii);
+    sprintf(filename,"12C_result-%d.dat",ii);
     fp_r[ii] = fopen(filename,"w");
   }
 
@@ -563,11 +563,9 @@ int main(int argc, char *argv[]){
   //    theta3_deg = rndm->Uniform(THETA3_START, THETA3_STOP);
   for(int ii=0;ii<N_EVENT;){
     printf("%d ",ii);
-    theta3_deg = rndm->Uniform(70, 90);
+    theta3_deg = rndm->Uniform(70, 110);
     double Ex2 = 0;//MeV
-    if(rndm->Uniform(0.,1.)<0.5){
-      Ex2 = 2.;//MeV
-    }
+
     if(a.calc(beam_ene,theta3_deg,0,Ex2)==1){
       theta3_deg = rndm->Uniform(70,a.getthr3_max());
       a.calc(beam_ene,theta3_deg,0,Ex2);
